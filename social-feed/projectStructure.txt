@@ -1,0 +1,29 @@
+src/
+├── components/
+│   ├── Feed/
+│   │   ├── Feed.tsx
+│   │   ├── FeedItem.tsx
+│   │   └── useFeed.ts
+│   ├── Post/
+│   │   ├── Post.tsx
+│   │   ├── PostActions.tsx
+│   │   ├── Comments.tsx
+│   │   └── CommentForm.tsx
+│   ├── UI/
+│   │   ├── Button.tsx
+│   │   ├── LoadingSpinner.tsx
+│   │   └── Modal.tsx
+│   └── Layout/
+│       └── Header.tsx
+├── hooks/
+│   ├── useInfiniteScroll.ts
+│   └── useGraphQL.ts
+├── types/
+│   └── index.ts
+├── graphql/
+│   ├── queries.ts
+│   └── mutations.ts
+├── utils/
+│   └── apolloClient.ts
+└── styles/
+    └── globals.css
