@@ -1,4 +1,4 @@
-src/
+social-feed/
 ├── components/
 │   ├── Feed/
 │   │   ├── Feed.tsx
