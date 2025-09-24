@@ -1,0 +1,14 @@
+social-media-feed/
+├── src/
+│   ├── components/
+│   │   ├── Feed/
+│   │   ├── Post/
+│   │   ├── Comment/
+│   │   └── UI/
+│   ├── hooks/
+│   ├── graphql/
+│   ├── types/
+│   ├── styles/
+│   └── utils/
+├── public/
+└── docs/
