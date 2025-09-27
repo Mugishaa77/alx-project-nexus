@@ -1,14 +1,26 @@
-social-media-feed/
-├── src/
-│   ├── components/
-│   │   ├── Feed/
-│   │   ├── Post/
-│   │   ├── Comment/
-│   │   └── UI/
-│   ├── hooks/
+social-media-app/
+├── app/
+│   ├── (tabs)/
+│   │   ├── _layout.tsx
+│   │   ├── index.tsx          # Feed tab
+│   │   ├── search.tsx         # Search tab
+│   │   └── profile.tsx        # Profile tab
+│   ├── post/
+│   │   └── [id].tsx           # Individual post page
 │   ├── graphql/
+│   │   ├── client.ts
+│   │   ├── queries.ts
+│   │   └── mutations.ts
+│   ├── components/
+│   │   ├── Post.tsx
+│   │   ├── CommentSection.tsx
+│   │   ├── LoadingSpinner.tsx
+│   │   └── ActionButton.tsx
 │   ├── types/
-│   ├── styles/
-│   └── utils/
-├── public/
-└── docs/
+│   │   └── index.ts
+│   ├── utils/
+│   │   └── constants.ts
+│   └── _layout.tsx
+├── assets/
+├── package.json
+└── app.json
