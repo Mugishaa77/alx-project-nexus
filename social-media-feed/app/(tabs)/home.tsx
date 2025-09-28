@@ -21,10 +21,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-// GraphQL Client Setup with JSONPlaceholder integration
+// GraphQL Client Setup with DummyJSON integration (similar to index.tsx)
 class GraphQLClient {
-  private baseUrl = 'https://jsonplaceholder.typicode.com';
-  
+  private currentUser: any = null;
+  private posts: any[] = [];
+  private users: any[] = [];
+
   async query(query: string, variables?: any): Promise<any> {
     // Simulate GraphQL query delay
     await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
@@ -46,60 +48,98 @@ class GraphQLClient {
   }
   
   private async getUserProfile() {
-    return {
-      data: {
-        user: {
-          id: '1',
-          name: 'Sally Wanga',
-          username: 'mugisha',
-          bio: 'React Native Developer | Building amazing mobile experiences 🚀',
-          avatar: 'https://drive.google.com/file/d/11_6IeGFTcR4OTF17-K_6xfgtHmM2bhMc/view?usp=sharing',
-          coverImage: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&h=200&fit=crop',
-          postsCount: 100,
-          followers: 1284,
-          following: 563,
-          joinedDate: 'January 2023',
-          website: 'mugisha.dev',
-          location: 'Nairobi, Kenya',
+    try {
+      // Get a specific user from DummyJSON as the profile user
+      const response = await fetch('https://dummyjson.com/users/1');
+      const userData = await response.json();
+      
+      return {
+        data: {
+          user: {
+            id: userData.id.toString(),
+            name: 'Sally Wanga',
+            username: 'mugisha',
+            bio: 'Frontend Developer | Building amazing experiences with technology',
+            avatar: userData.image,
+            coverImage: `https://picsum.photos/400/200?random=${userData.id}`,
+            postsCount: Math.floor(Math.random() * 200) + 50,
+            followers: Math.floor(Math.random() * 5000) + 1000,
+            following: Math.floor(Math.random() * 1000) + 200,
+            joinedDate: 'January 2023',
+            website: 'mugisha.dev',
+            location: 'Nairobi, Kenya',
+          }
         }
-      }
-    };
+      };
+    } catch (error) {
+      // Fallback data if API fails
+      return {
+        data: {
+          user: {
+            id: '1',
+            name: 'Sally Wanga',
+            username: 'mugisha',
+            bio: 'React Native Developer | Building amazing mobile experiences',
+            avatar: 'https://i.pravatar.cc/150?img=1',
+            coverImage: 'https://picsum.photos/400/200?random=1',
+            postsCount: 100,
+            followers: 1284,
+            following: 563,
+            joinedDate: 'January 2023',
+            website: 'mugisha.dev',
+            location: 'Nairobi, Kenya',
+          }
+        }
+      };
+    }
   }
   
-  // Enhanced getUserPosts with real JSONPlaceholder data
   private async getUserPosts(offset: number, limit: number) {
     try {
-      // Fetch posts from JSONPlaceholder
-      const postsResponse = await fetch(`${this.baseUrl}/posts?_start=${offset}&_limit=${limit}`);
-      const posts = await postsResponse.json();
+      // Calculate skip for pagination
+      const skip = offset;
       
-      // Fetch photos from JSONPlaceholder for media posts
-      const photosResponse = await fetch(`${this.baseUrl}/photos?_start=${offset}&_limit=${Math.ceil(limit / 2)}`);
-      const photos = await photosResponse.json();
-      
-      // Create enhanced posts with real content
-      const enhancedPosts = posts.map((post: any, index: number) => {
+      // Fetch posts and users from DummyJSON
+      const [postsResponse, usersResponse] = await Promise.all([
+        fetch(`https://dummyjson.com/posts?limit=${limit}&skip=${skip}`),
+        fetch('https://dummyjson.com/users?limit=30')
+      ]);
+
+      const [postsData, usersData] = await Promise.all([
+        postsResponse.json(),
+        usersResponse.json()
+      ]);
+
+      // Transform posts with English content and reliable images
+      const enhancedPosts = postsData.posts.map((post: any, index: number) => {
         const hasImage = Math.random() > 0.4; // 60% chance of having an image
-        const photo = photos[index % photos.length];
+        const randomUserIndex = Math.floor(Math.random() * usersData.users.length);
+        const randomUser = usersData.users[randomUserIndex];
         
         return {
-          id: post.id.toString(),
-          content: this.enhancePostContent(post.title, post.body),
-          image: hasImage ? photo?.url : undefined,
-          likes: Math.floor(Math.random() * 200) + 10,
+          id: `post_${post.id}_${offset}`, // Unique ID with offset
+          content: post.body, // DummyJSON already has good English content
+          image: hasImage ? `https://picsum.photos/400/300?random=${post.id + offset}` : undefined,
+          likes: post.reactions?.likes || Math.floor(Math.random() * 200) + 10,
           comments: Math.floor(Math.random() * 50) + 1,
           timestamp: this.getRandomTimestamp(),
           isLiked: Math.random() > 0.7,
           type: hasImage ? 'media' : 'text',
-          userId: post.userId
+          userId: post.userId,
+          author: {
+            id: randomUser.id.toString(),
+            name: `${randomUser.firstName} ${randomUser.lastName}`,
+            username: randomUser.username,
+            avatar: randomUser.image
+          }
         };
       });
       
       return {
         data: {
           posts: enhancedPosts,
-          hasMore: posts.length === limit, // If we got the full limit, there might be more
-          total: 100 // JSONPlaceholder has 100 posts
+          hasMore: postsData.posts.length === limit, // If we got the full limit, there might be more
+          total: 150 // DummyJSON has 150 posts
         }
       };
     } catch (error) {
@@ -111,20 +151,6 @@ class GraphQLClient {
           total: 0
         }
       };
-    }
-  }
-  
-  private enhancePostContent(title: string, body: string): string {
-    // Make content more social media friendly
-    const emojis = ['🚀', '💻', '🌟', '👨‍💻', '📱', '💡', '🎯', '🔥', '✨', '💪', '🎉', '📸', '🌍', '💫'];
-    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-    
-    // Sometimes use just the title, sometimes combine with body excerpt
-    if (Math.random() > 0.6) {
-      return `${title} ${randomEmoji}`;
-    } else {
-      const bodyExcerpt = body.length > 100 ? body.substring(0, 100) + '...' : body;
-      return `${title}\n\n${bodyExcerpt} ${randomEmoji}`;
     }
   }
   
@@ -151,7 +177,7 @@ class GraphQLClient {
     return {
       data: {
         addComment: {
-          id: Date.now().toString(),
+          id: `comment_${Date.now()}_${Math.random()}`, // More unique ID
           content: comment,
           author: 'You',
           timestamp: 'now',
@@ -162,17 +188,28 @@ class GraphQLClient {
   
   private async getComments(postId: string) {
     try {
-      // Fetch real comments from JSONPlaceholder
-      const response = await fetch(`${this.baseUrl}/comments?postId=${postId}&_limit=5`);
-      const comments = await response.json();
+      // Fetch real comments and users from DummyJSON
+      const [commentsResponse, usersResponse] = await Promise.all([
+        fetch(`https://dummyjson.com/comments?limit=5`),
+        fetch(`https://dummyjson.com/users?limit=10`)
+      ]);
       
-      const enhancedComments = comments.map((comment: any) => ({
-        id: comment.id.toString(),
-        content: comment.body,
-        author: comment.name,
-        timestamp: this.getRandomTimestamp(),
-        avatar: `https://images.unsplash.com/photo-${1500000000000 + parseInt(comment.id)}?w=50&h=50&fit=crop&crop=face`
-      }));
+      const [commentsData, usersData] = await Promise.all([
+        commentsResponse.json(),
+        usersResponse.json()
+      ]);
+      
+      const enhancedComments = commentsData.comments.map((comment: any, index: number) => {
+        const randomUser = usersData.users[index % usersData.users.length];
+        
+        return {
+          id: `comment_${comment.id}_${postId}`, // Unique ID with post context
+          content: comment.body, // DummyJSON comments are in English
+          author: `${randomUser.firstName} ${randomUser.lastName}`,
+          timestamp: this.getRandomTimestamp(),
+          avatar: randomUser.image
+        };
+      });
       
       return {
         data: {
@@ -270,6 +307,12 @@ interface Post {
   isLiked: boolean;
   type: 'media' | 'text';
   userId?: number;
+  author?: {
+    id: string;
+    name: string;
+    username: string;
+    avatar: string;
+  };
 }
 
 interface User {
@@ -520,12 +563,18 @@ export default function ProfileScreen() {
     }
   };
 
-  const renderPost = ({ item: post }: { item: Post }) => (
+  const renderPost = ({ item: post, index }: { item: Post; index: number }) => (
     <View style={styles.postCard}>
       <Text style={styles.postContent}>{post.content}</Text>
       {post.image && (
         <TouchableOpacity onPress={() => {/* Handle image view */}}>
-          <Image source={{ uri: post.image }} style={styles.postImage} />
+          <Image 
+            source={{ uri: post.image }} 
+            style={styles.postImage}
+            onError={(error) => {
+              console.log('Image failed to load:', error.nativeEvent.error);
+            }}
+          />
           {activeTab === 'media' && (
             <View style={styles.mediaBadge}>
               <Ionicons name="camera" size={12} color="#fff" />
@@ -575,6 +624,9 @@ export default function ProfileScreen() {
         <Image 
           source={{ uri: user?.coverImage }} 
           style={styles.coverImage}
+          onError={(error) => {
+            console.log('Cover image failed to load:', error.nativeEvent.error);
+          }}
         />
         <View style={styles.coverOverlay} />
       </View>
@@ -582,7 +634,13 @@ export default function ProfileScreen() {
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <TouchableOpacity>
-          <Image source={{ uri: user?.avatar }} style={styles.avatar} />
+          <Image 
+            source={{ uri: user?.avatar }} 
+            style={styles.avatar}
+            onError={(error) => {
+              console.log('Avatar failed to load:', error.nativeEvent.error);
+            }}
+          />
         </TouchableOpacity>
         
         <View style={styles.statsContainer}>
@@ -736,7 +794,7 @@ export default function ProfileScreen() {
       <FlatList
         data={filteredPosts}
         renderItem={renderPost}
-        keyExtractor={(item) => `${activeTab}-${item.id}`}
+        keyExtractor={(item, index) => `${activeTab}-${item.id}-${index}`} // Fixed: More unique keys
         ListHeaderComponent={renderHeader}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmptyState}
@@ -755,14 +813,9 @@ export default function ProfileScreen() {
         maxToRenderPerBatch={5}
         windowSize={10}
         removeClippedSubviews={true}
-        getItemLayout={(data, index) => ({
-          length: 200, // Approximate item height
-          offset: 200 * index,
-          index,
-        })}
+        getItemLayout={undefined} // Remove fixed height for dynamic content
       />
 
-      {/* All Modals remain the same... */}
       {/* Edit Profile Modal */}
       <Modal
         visible={showEditModal}
@@ -856,8 +909,11 @@ export default function ProfileScreen() {
               {comments.map((comment) => (
                 <View key={comment.id} style={styles.commentItem}>
                   <Image 
-                    source={{ uri: comment.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face' }}
+                    source={{ uri: comment.avatar || 'https://i.pravatar.cc/40?img=1' }}
                     style={styles.commentAvatar}
+                    onError={(error) => {
+                      console.log('Comment avatar failed to load:', error.nativeEvent.error);
+                    }}
                   />
                   <View style={styles.commentContent}>
                     <View style={styles.commentHeader}>
