@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx
+// app/(tabs)/home.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -18,8 +18,6 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-
 
 const { width } = Dimensions.get('window');
 
@@ -55,7 +53,7 @@ class GraphQLClient {
           name: 'Sally Wanga',
           username: 'mugisha',
           bio: 'React Native Developer | Building amazing mobile experiences 🚀',
-          avatar: 'profilePic',
+          avatar: 'https://photos.fife.usercontent.google.com/pw/AP1GczP_TZubyse3kcZV9aRX7q90hYtZl_7nFr2nCNwy__KkRXPdaOKVcqI-Mg=w372-h827-s-no-gm?authuser=0',
           coverImage: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&h=200&fit=crop',
           postsCount: 24,
           followers: 1284,
@@ -114,16 +112,6 @@ class GraphQLClient {
         timestamp: '1w ago',
         isLiked: false,
       },
-      // Add more mock posts for pagination
-      ...Array.from({ length: 20 }, (_, i) => ({
-        id: `${6 + i}`,
-        content: `Mock post content ${6 + i}. This is a sample post for testing pagination and infinite scrolling functionality.`,
-        image: i % 3 === 0 ? `https://images.unsplash.com/photo-${1500000000000 + i}?w=300&h=200&fit=crop` : undefined,
-        likes: Math.floor(Math.random() * 200),
-        comments: Math.floor(Math.random() * 50),
-        timestamp: `${Math.floor(Math.random() * 30)}d ago`,
-        isLiked: Math.random() > 0.5,
-      }))
     ];
     
     const posts = allPosts.slice(offset, offset + limit);
@@ -138,12 +126,12 @@ class GraphQLClient {
   }
   
   private async likePost(postId: string) {
+    // Return success without changing the like count
     return {
       data: {
         likePost: {
           id: postId,
-          likes: Math.floor(Math.random() * 200) + 50,
-          isLiked: true,
+          success: true,
         }
       }
     };
@@ -229,8 +217,7 @@ const QUERIES = {
     mutation likePost($postId: ID!) {
       likePost(postId: $postId) {
         id
-        likes
-        isLiked
+        success
       }
     }
   `,
@@ -389,9 +376,27 @@ export default function ProfileScreen() {
   };
 
   const handleLikePost = async (postId: string) => {
-    console.log('Like pressed for post:', postId); // Debug log
+    console.log('Like pressed for post:', postId);
+    
+    // Optimistic update - update UI immediately
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { 
+            ...post, 
+            isLiked: !post.isLiked,
+            likes: post.isLiked ? post.likes - 1 : post.likes + 1
+          }
+        : post
+    ));
+
     try {
-      // Optimistic update
+      // Send request to server (but don't use the response to update UI)
+      await client.query(QUERIES.LIKE_POST, { postId });
+      console.log('Like request sent successfully');
+    } catch (error) {
+      console.error('Error liking post:', error);
+      
+      // Revert the optimistic update if server request failed
       setPosts(prev => prev.map(post => 
         post.id === postId 
           ? { 
@@ -401,29 +406,8 @@ export default function ProfileScreen() {
             }
           : post
       ));
-
-      // API call
-      const response = await client.query(QUERIES.LIKE_POST, { postId });
       
-      // Update with server response
-      setPosts(prev => prev.map(post => 
-        post.id === postId 
-          ? { ...post, likes: response.data.likePost.likes, isLiked: response.data.likePost.isLiked }
-          : post
-      ));
-      
-    } catch (error) {
-      // Revert optimistic update on error
-      setPosts(prev => prev.map(post => 
-        post.id === postId 
-          ? { 
-              ...post, 
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes + 1 : post.likes - 1
-            }
-          : post
-      ));
-      Alert.alert('Error', 'Failed to update like');
+      Alert.alert('Error', 'Failed to like post. Please try again.');
     }
   };
 
@@ -506,120 +490,181 @@ export default function ProfileScreen() {
     ]);
   };
 
- const renderPost = ({ item: post }: { item: Post; index: number }) => (
-  <View style={styles.postCard}>
-    <Text style={styles.postContent}>{post.content}</Text>
-    {post.image && (
-      <Image source={{ uri: post.image }} style={styles.postImage} />
-    )}
-    <View style={styles.postActions}>
-      <TouchableOpacity 
-        style={styles.postAction}
-        onPress={() => handleLikePost(post.id)}
-      >
-        <Ionicons 
-          name={post.isLiked ? "heart" : "heart-outline"} 
-          size={20} 
-          color={post.isLiked ? "#ff3040" : "#666"} 
-        />
-        <Text style={[styles.actionText, post.isLiked && { color: '#ff3040' }]}>
-          {post.likes}
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.postAction}
-        onPress={() => openCommentsModal(post)}
-      >
-        <Ionicons name="chatbubble-outline" size={20} color="#666" />
-        <Text style={styles.actionText}>{post.comments}</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.postAction}
-        onPress={() => handleSharePost(post)}
-      >
-        <Ionicons name="share-outline" size={20} color="#666" />
-      </TouchableOpacity>
-      
-      <Text style={styles.timestamp}>{post.timestamp}</Text>
+  // Get filtered posts based on active tab
+  const getFilteredPosts = () => {
+    switch (activeTab) {
+      case 'posts':
+        return posts;
+      case 'media':
+        return posts.filter(post => post.image);
+      case 'likes':
+        return posts.filter(post => post.isLiked);
+      default:
+        return posts;
+    }
+  };
+
+  const renderPost = ({ item: post }: { item: Post }) => (
+    <View style={styles.postCard}>
+      <Text style={styles.postContent}>{post.content}</Text>
+      {post.image && (
+        <Image source={{ uri: post.image }} style={styles.postImage} />
+      )}
+      <View style={styles.postActions}>
+        <TouchableOpacity 
+          style={styles.postAction}
+          onPress={() => handleLikePost(post.id)}
+        >
+          <Ionicons 
+            name={post.isLiked ? "heart" : "heart-outline"} 
+            size={20} 
+            color={post.isLiked ? "#ff3040" : "#666"} 
+          />
+          <Text style={[styles.actionText, post.isLiked && { color: '#ff3040' }]}>
+            {post.likes}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.postAction}
+          onPress={() => openCommentsModal(post)}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color="#666" />
+          <Text style={styles.actionText}>{post.comments}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.postAction}
+          onPress={() => handleSharePost(post)}
+        >
+          <Ionicons name="share-outline" size={20} color="#666" />
+        </TouchableOpacity>
+        
+        <Text style={styles.timestamp}>{post.timestamp}</Text>
+      </View>
     </View>
-  </View>
-);
-  const renderLoadingFooter = () => {
-    if (!loadingMore) return null;
+  );
+
+  const renderHeader = () => (
+    <>
+      {/* Cover Image */}
+      <View style={styles.coverContainer}>
+        <Image 
+          source={{ uri: user?.coverImage }} 
+          style={styles.coverImage}
+        />
+        <View style={styles.coverOverlay} />
+      </View>
+
+      {/* Profile Header */}
+      <View style={styles.profileHeader}>
+        <TouchableOpacity>
+          <Image source={{ uri: user?.avatar }} style={styles.avatar} />
+        </TouchableOpacity>
+        
+        <View style={styles.statsContainer}>
+          <TouchableOpacity style={styles.stat}>
+            <Text style={styles.statNumber}>{user?.postsCount}</Text>
+            <Text style={styles.statLabel}>Posts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.stat}
+            onPress={() => setFollowersModal(true)}
+          >
+            <Text style={styles.statNumber}>{user?.followers.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.stat}
+            onPress={() => setFollowersModal(true)}
+          >
+            <Text style={styles.statNumber}>{user?.following}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* User Info */}
+      <View style={styles.userInfo}>
+        <Text style={styles.name}>{user?.name}</Text>
+        <Text style={styles.username}>@{user?.username}</Text>
+        <Text style={styles.bio}>{user?.bio}</Text>
+        
+        <View style={styles.details}>
+          <Ionicons name="location-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{user?.location}</Text>
+        </View>
+        
+        <TouchableOpacity style={styles.details}>
+          <Ionicons name="link-outline" size={16} color="#666" />
+          <Text style={[styles.detailText, styles.link]}>{user?.website}</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.details}>
+          <Ionicons name="calendar-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>Joined {user?.joinedDate}</Text>
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+          <Text style={styles.editButtonText}>Edit Profile</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Profile Navigation */}
+      <View style={styles.profileNav}>
+        {['posts', 'media', 'likes'].map((tab) => (
+          <TouchableOpacity 
+            key={tab}
+            style={[styles.navItem, activeTab === tab && styles.activeNavItem]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.navText, activeTab === tab && styles.activeNavText]}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </>
+  );
+
+  const renderEmptyState = () => {
+    let emptyMessage = 'No posts yet';
+    let emptySubtext = 'When you create posts, they\'ll appear here';
     
+    if (activeTab === 'media') {
+      emptyMessage = 'No media posts';
+      emptySubtext = 'Posts with photos and videos will appear here';
+    } else if (activeTab === 'likes') {
+      emptyMessage = 'No liked posts';
+      emptySubtext = 'Posts you like will appear here';
+    }
+
     return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color="#5D0A85" />
-        <Text style={styles.loadingText}>Loading more posts...</Text>
+      <View style={styles.emptyState}>
+        <Ionicons name="document-text-outline" size={48} color="#ccc" />
+        <Text style={styles.emptyStateText}>{emptyMessage}</Text>
+        <Text style={styles.emptyStateSubtext}>{emptySubtext}</Text>
       </View>
     );
   };
 
-  const renderTabContent = () => {
-    if (loading) {
+  const renderFooter = () => {
+    if (loadingMore) {
       return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5D0A85" />
-          <Text style={styles.loadingText}>Loading posts...</Text>
+        <View style={styles.loadingFooter}>
+          <ActivityIndicator size="small" color="#5D0A85" />
+          <Text style={styles.loadingText}>Loading more posts...</Text>
         </View>
       );
     }
-
-    switch (activeTab) {
-      case 'posts':
-        return posts.length > 0 ? (
-          <FlatList
-            data={posts}
-            renderItem={renderPost}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.postsContainer}
-            onEndReached={loadMorePosts}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={renderLoadingFooter}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyStateText}>No posts yet</Text>
-            <Text style={styles.emptyStateSubtext}>When you create posts, they'll appear here</Text>
-          </View>
-        );
-      
-      case 'media':
-        const mediaPosts = posts.filter(post => post.image);
-        return mediaPosts.length > 0 ? (
-          <ScrollView style={styles.mediaGrid}>
-            <View style={styles.mediaRow}>
-              {mediaPosts.map((post) => (
-                <TouchableOpacity key={post.id} style={styles.mediaItem}>
-                  <Image source={{ uri: post.image }} style={styles.mediaImage} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="image-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyStateText}>No media posts yet</Text>
-            <Text style={styles.emptyStateSubtext}>Photos and videos will appear here</Text>
-          </View>
-        );
-      
-      case 'likes':
-        return (
-          <View style={styles.emptyState}>
-            <Ionicons name="heart-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyStateText}>No liked posts yet</Text>
-            <Text style={styles.emptyStateSubtext}>Posts you like will appear here</Text>
-          </View>
-        );
-      
-      default:
-        return null;
-    }
+    return null;
   };
 
   // Animated header
@@ -638,6 +683,8 @@ export default function ProfileScreen() {
     );
   }
 
+  const filteredPosts = getFilteredPosts();
+
   return (
     <View style={styles.container}>
       {/* Animated Header */}
@@ -645,106 +692,28 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>{user.name}</Text>
       </Animated.View>
 
-      <Animated.ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
+      {/* Single FlatList with filtered posts based on active tab */}
+      <FlatList
+        data={filteredPosts}
+        renderItem={renderPost}
+       keyExtractor={(item) => `${activeTab}-${item.id}`}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={activeTab === 'posts' ? loadMorePosts : undefined}
+        onEndReachedThreshold={0.5}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
-      >
-        {/* Cover Image */}
-        <View style={styles.coverContainer}>
-          <Image 
-            source={{ uri: user.coverImage }} 
-            style={styles.coverImage}
-          />
-          <View style={styles.coverOverlay} />
-        </View>
-
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <TouchableOpacity>
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
-          </TouchableOpacity>
-          
-          <View style={styles.statsContainer}>
-            <TouchableOpacity style={styles.stat}>
-              <Text style={styles.statNumber}>{user.postsCount}</Text>
-              <Text style={styles.statLabel}>Posts</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.stat}
-              onPress={() => setFollowersModal(true)}
-            >
-              <Text style={styles.statNumber}>{user.followers.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.stat}
-              onPress={() => setFollowersModal(true)}
-            >
-              <Text style={styles.statNumber}>{user.following}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* User Info */}
-        <View style={styles.userInfo}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.username}>@{user.username}</Text>
-          <Text style={styles.bio}>{user.bio}</Text>
-          
-          <View style={styles.details}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>{user.location}</Text>
-          </View>
-          
-          <TouchableOpacity style={styles.details}>
-            <Ionicons name="link-outline" size={16} color="#666" />
-            <Text style={[styles.detailText, styles.link]}>{user.website}</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.details}>
-            <Ionicons name="calendar-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>Joined {user.joinedDate}</Text>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Navigation */}
-        <View style={styles.profileNav}>
-          {['posts', 'media', 'likes'].map((tab) => (
-            <TouchableOpacity 
-              key={tab}
-              style={[styles.navItem, activeTab === tab && styles.activeNavItem]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.navText, activeTab === tab && styles.activeNavText]}>
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Tab Content */}
-        {renderTabContent()}
-      </Animated.ScrollView>
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.flatListContent}
+        key={activeTab} // Force re-render when tab changes
+      />
 
       {/* Edit Profile Modal */}
       <Modal
@@ -909,6 +878,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  flatListContent: {
+    flexGrow: 1,
+  },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -943,9 +915,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  scrollView: {
-    flex: 1,
   },
   coverContainer: {
     height: 150,
@@ -1075,14 +1044,12 @@ const styles = StyleSheet.create({
   activeNavText: {
     color: '#5D0A85',
   },
-  postsContainer: {
-    padding: 16,
-  },
   postCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    marginHorizontal: 16,
     borderWidth: 1,
     borderColor: '#f0f0f0',
     shadowColor: '#000',
@@ -1127,24 +1094,6 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     color: '#999',
     fontSize: 12,
-  },
-  mediaGrid: {
-    flex: 1,
-  },
-  mediaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 2,
-  },
-  mediaItem: {
-    width: (width - 8) / 3,
-    height: (width - 8) / 3,
-    padding: 2,
-  },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
   },
   emptyState: {
     alignItems: 'center',
@@ -1281,12 +1230,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#f9f9f9',
   },
-  commentButton: {
-    backgroundColor: '#5D0A85',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+    commentButton: {
+      backgroundColor: '#5D0A85',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
