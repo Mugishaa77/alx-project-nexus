@@ -18,6 +18,15 @@ export default function TabLayout() {
       tabBarActiveTintColor: '#5D0A85',
       tabBarInactiveTintColor: '#666',
     }}>
+       <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -27,15 +36,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
+     
     </Tabs>
   );
 }
