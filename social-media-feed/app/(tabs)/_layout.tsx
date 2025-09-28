@@ -1,17 +1,23 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useColorScheme } from 'react-native'; // Use React Native's built-in hook
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colorScheme === 'dark' ? '#fff' : '#000',
-        headerShown: false,
-      }}>
+    <Tabs screenOptions={{ 
+      headerShown: true,
+      headerTitle: "Mugisha's Project Nexus",
+      headerTitleStyle: {
+        fontWeight: 'bold',
+        fontSize: 18,
+        textAlign: 'center',
+      },
+      headerStyle: {
+        backgroundColor: '#5D0A85', // Optional: customize background
+      },
+      tabBarActiveTintColor: '#5D0A85',
+      tabBarInactiveTintColor: '#666',
+    }}>
       <Tabs.Screen
         name="index"
         options={{
@@ -22,7 +28,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (

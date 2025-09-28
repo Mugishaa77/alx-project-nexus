@@ -1,42 +1,41 @@
 // app/components/Post.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
-import { useMutation } from '@apollo/client/react';
+
 import { Post as PostType } from '../types';
 import ActionButton from './ActionButton';
 import { Link } from 'expo-router';
-import { LIKE_POST } from '../app/graphql/mutations';
 
 interface PostProps {
   post: PostType;
+  onLike: (postId: string) => void;
+  onComment: (post: PostType) => void;
+  onShare: (postId: string) => void;
 }
 
-export default function Post({ post }: PostProps) {
-  const [likePost] = useMutation(LIKE_POST);
+export default function Post({ post, onLike, onComment, onShare }: PostProps) {
+  const handleLikePress = () => {
+    console.log('❤️ Post Component: Like pressed for post:', post.id);
+    console.log('❤️ Post Component: onLike function:', typeof onLike);
+    onLike(post.id);
+  };
 
-  const handleLike = async () => {
-    try {
-      await likePost({
-        variables: { postId: post.id },
-        optimisticResponse: {
-          likePost: {
-            __typename: 'Post',
-            id: post.id,
-            likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-            isLiked: !post.isLiked,
-          }
-        }
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to like post');
-    }
+  const handleCommentPress = () => {
+    console.log('💬 Post Component: Comment pressed for post:', post.id);
+    console.log('💬 Post Component: onComment function:', typeof onComment);
+    onComment(post);
+  };
+
+  const handleSharePress = () => {
+    console.log('🔄 Post Component: Share pressed for post:', post.id);
+    console.log('🔄 Post Component: onShare function:', typeof onShare);
+    onShare(post.id);
   };
 
   return (
@@ -51,7 +50,7 @@ export default function Post({ post }: PostProps) {
       </View>
 
       {/* Post Content */}
-      <Link href={{ pathname: "/two", params: { id: post.id } }} asChild>
+      <Link href={{ pathname: "/profile", params: { id: post.id } }} asChild>
         <TouchableOpacity>
           <Text style={styles.content}>{post.content}</Text>
           {post.imageUrl && (
@@ -69,17 +68,25 @@ export default function Post({ post }: PostProps) {
         <ActionButton
           icon={post.isLiked ? "heart" : "heart-outline"}
           count={post.likes}
-          onPress={handleLike}
-          isActive={post.isLiked} label={''}        />
+          onPress={handleLikePress}
+          isActive={post.isLiked}
+          label="Like"
+        />
         
         <ActionButton
           icon="chatbubble-outline"
           count={post.comments.length}
-          onPress={() => { } } label={''}        />
+          onPress={handleCommentPress}
+          label="Comment"
+        />
         
         <ActionButton
-          icon="share-outline"
-          onPress={() => Alert.alert('Share', 'Share functionality')} label={''}        />
+          icon={post.isShared ? "share-social" : "share-outline"}
+          count={post.shares || 0}
+          onPress={handleSharePress}
+          isActive={post.isShared}
+          label="Share"
+        />
       </View>
     </View>
   );
