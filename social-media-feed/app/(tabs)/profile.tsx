@@ -18,7 +18,6 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import profilePic from '../../assets/images/nexus.jpg';
 
 
 

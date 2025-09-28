@@ -399,36 +399,47 @@ const handleSharePost = async (postId: string) => {
 }
 
 // Fallback function for mock data
+// FIXED: Mock data generator with unique keys
 const generateMockPosts = async (count: number): Promise<PostType[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  return Array.from({ length: count }, (_, i) => ({
-    id: `post-${i + 1}`,
-    content: `This is a fallback post ${i + 1} with interactive features. You can like, comment, and share this post to test the functionality.`,
-    author: {
-      id: `user-${i + 1}`,
-      name: `User ${i + 1}`,
-      username: `user${i + 1}`,
-      avatar: `https://i.pravatar.cc/150?img=${i + 1}`
-    },
-    likes: Math.floor(Math.random() * 100),
-    isLiked: Math.random() > 0.5,
-    shares: Math.floor(Math.random() * 50),
-    isShared: false,
-    comments: Array.from({ length: Math.floor(Math.random() * 5) }, (_, j) => ({
-      id: `comment-${i}-${j}`,
-      content: `This is comment ${j + 1} on post ${i + 1}`,
+  
+  // Use a counter to ensure unique IDs across all posts
+  let commentIdCounter = 1;
+  
+  return Array.from({ length: count }, (_, i) => {
+    const commentCount = Math.floor(Math.random() * 5);
+    
+    return {
+      id: `post-${Date.now()}-${i}`, // More unique post ID
+      content: `This is a fallback post ${i + 1} with interactive features. You can like, comment, and share this post to test the functionality.`,
       author: {
-        id: `commenter-${j}`,
-        name: `Commenter ${j + 1}`,
-        username: `commenter${j + 1}`,
-        avatar: `https://i.pravatar.cc/150?img=${j + 10}`
+        id: `user-${Date.now()}-${i}`,
+        name: `User ${i + 1}`,
+        username: `user${i + 1}`,
+        avatar: `https://i.pravatar.cc/150?img=${i + 1}`
       },
+      likes: Math.floor(Math.random() * 100),
+      isLiked: Math.random() > 0.5,
+      shares: Math.floor(Math.random() * 50),
+      isShared: false,
+      comments: Array.from({ length: commentCount }, (_, j) => {
+        const commentId = `comment-${Date.now()}-${commentIdCounter++}`;
+        return {
+          id: commentId,
+          content: `This is comment ${j + 1} on post ${i + 1}`,
+          author: {
+            id: `commenter-${Date.now()}-${commentIdCounter}`,
+            name: `Commenter ${j + 1}`,
+            username: `commenter${j + 1}`,
+            avatar: `https://i.pravatar.cc/150?img=${j + 10}`
+          },
+          createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString()
+        };
+      }),
       createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString()
-    })),
-    createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString()
-  }));
+    };
+  });
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

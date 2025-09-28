@@ -1,4 +1,3 @@
-// app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,22 +10,14 @@ export default function TabLayout() {
         fontWeight: 'bold',
         fontSize: 18,
         textAlign: 'center',
+        flex: 1, // Better centering
       },
       headerStyle: {
-        backgroundColor: '#5D0A85', // Optional: customize background
+        backgroundColor: '#5D0A85',
       },
       tabBarActiveTintColor: '#5D0A85',
       tabBarInactiveTintColor: '#666',
     }}>
-       <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
       <Tabs.Screen
         name="index"
         options={{
@@ -36,7 +27,15 @@ export default function TabLayout() {
           ),
         }}
       />
-     
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile', // Consider renaming for consistency
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
