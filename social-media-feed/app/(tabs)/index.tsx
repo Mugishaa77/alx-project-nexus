@@ -15,10 +15,176 @@ import {
 } from 'react-native';
 import Post from '../../components/Posts';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { Post as PostType, Comment } from '../../types';
-import { getPosts, likePost, addComment, sharePost } from '../services/api';
+import { Post as PostType, Comment, User } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+
+// Mock GraphQL-like queries for DummyJSON data (better English content)
+class GraphQLService {
+  private currentUser: User | null = null;
+  private posts: PostType[] = [];
+  private users: User[] = [];
+
+  async initializeCurrentUser() {
+    if (this.currentUser) return this.currentUser;
+    
+    // Get random user from DummyJSON as current user
+    const userId = Math.floor(Math.random() * 30) + 1;
+    try {
+      const response = await fetch(`https://dummyjson.com/users/${userId}`);
+      const userData = await response.json();
+      
+      this.currentUser = {
+        id: userData.id.toString(),
+        name: `${userData.firstName} ${userData.lastName}`,
+        username: userData.username,
+        avatar: userData.image
+      };
+    } catch (error) {
+      // Fallback user if API fails
+      this.currentUser = {
+        id: '1',
+        name: 'Sally Wanga',
+        username: 'mugisha',
+        avatar: 'https://i.pravatar.cc/150?img=1'
+      };
+    }
+    
+    return this.currentUser;
+  }
+
+  async fetchUsers() {
+    if (this.users.length > 0) return this.users;
+    
+    const response = await fetch('https://dummyjson.com/users?limit=30');
+    const usersData = await response.json();
+    
+    this.users = usersData.users.map((user: any) => ({
+      id: user.id.toString(),
+      name: `${user.firstName} ${user.lastName}`,
+      username: user.username,
+      email: user.email,
+      avatar: user.image
+    }));
+    
+    return this.users;
+  }
+
+  async fetchPosts(page: number = 1, limit: number = 10) {
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+    
+    // Fetch posts with better English content from DummyJSON
+    const [postsResponse, usersResponse, commentsResponse] = await Promise.all([
+      fetch(`https://dummyjson.com/posts?limit=${limit}&skip=${skip}`),
+      fetch('https://dummyjson.com/users?limit=30'),
+      fetch('https://dummyjson.com/comments?limit=100')
+    ]);
+
+    const [postsData, usersData, commentsData] = await Promise.all([
+      postsResponse.json(),
+      usersResponse.json(),
+      commentsResponse.json()
+    ]);
+
+    // Group comments by post (simulate post-comment relationships)
+    const commentsByPost: { [key: string]: any[] } = {};
+    
+    // Distribute comments across posts
+    commentsData.comments.forEach((comment: any, index: number) => {
+      const postIndex = (index % postsData.posts.length) + 1;
+      const postKey = postIndex;
+      
+      if (!commentsByPost[postKey]) {
+        commentsByPost[postKey] = [];
+      }
+      
+      if (commentsByPost[postKey].length < 5) { // Limit comments per post
+        // Get a random user from the users data for the comment
+        const randomUserIndex = Math.floor(Math.random() * usersData.users.length);
+        const randomCommenter = usersData.users[randomUserIndex];
+        
+        commentsByPost[postKey].push({
+          id: `comment-${comment.id}`,
+          content: comment.body,
+          author: {
+            id: randomCommenter.id.toString(),
+            name: `${randomCommenter.firstName} ${randomCommenter.lastName}`,
+            username: randomCommenter.username,
+            email: randomCommenter.email,
+            avatar: randomCommenter.image
+          },
+          createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
+      }
+    });
+
+    // Transform posts with English content
+    const transformedPosts: PostType[] = postsData.posts.map((post: any, index: number) => {
+      // Get a random user for each post
+      const randomUserIndex = Math.floor(Math.random() * usersData.users.length);
+      const randomUser = usersData.users[randomUserIndex];
+      
+      return {
+        id: `post-${post.id}`,
+        content: post.body,
+        author: {
+          id: randomUser.id.toString(),
+          name: `${randomUser.firstName} ${randomUser.lastName}`,
+          username: randomUser.username,
+          avatar: randomUser.image
+        },
+        likes: post.reactions?.likes || Math.floor(Math.random() * 100),
+        isLiked: Math.random() > 0.7,
+        shares: Math.floor(Math.random() * 50),
+        isShared: false,
+        comments: commentsByPost[index + 1] || [],
+        createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+      };
+    });
+
+    return transformedPosts;
+  }
+
+  async addComment(postId: string, content: string) {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const currentUser = await this.getCurrentUser();
+    
+    // Create new comment
+    const newComment: Comment = {
+      id: `comment-${Date.now()}-${Math.random()}`,
+      content,
+      author: currentUser,
+      createdAt: new Date().toISOString()
+    };
+
+    // In a real app, this would be sent to your backend
+    return { comment: newComment };
+  }
+
+  async getCurrentUser() {
+    if (!this.currentUser) {
+      await this.initializeCurrentUser();
+    }
+    return this.currentUser!;
+  }
+
+  async likePost(postId: string) {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { success: true };
+  }
+
+  async sharePost(postId: string) {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { success: true };
+  }
+}
+
+const graphqlService = new GraphQLService();
 
 export default function FeedScreen() {
   const [posts, setPosts] = useState<PostType[]>([]);
@@ -28,6 +194,7 @@ export default function FeedScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Comment modal state
   const [commentModalVisible, setCommentModalVisible] = useState(false);
@@ -35,7 +202,20 @@ export default function FeedScreen() {
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
-  // Fetch posts from the live API
+  // Initialize current user
+  useEffect(() => {
+    const initUser = async () => {
+      try {
+        const user = await graphqlService.getCurrentUser();
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('Failed to initialize user:', error);
+      }
+    };
+    initUser();
+  }, []);
+
+  // Fetch posts from DummyJSON via GraphQL-like service
   const fetchPosts = async (pageNum: number = 1, append: boolean = false) => {
     try {
       if (pageNum === 1) {
@@ -48,7 +228,7 @@ export default function FeedScreen() {
       setError(null);
       console.log('Fetching posts, page:', pageNum);
       
-      const newPosts = await getPosts(pageNum, 10);
+      const newPosts = await graphqlService.fetchPosts(pageNum, 10);
       console.log('Received posts:', newPosts.length);
       
       if (newPosts.length === 0) {
@@ -60,10 +240,6 @@ export default function FeedScreen() {
     } catch (err) {
       console.error('Error fetching posts:', err);
       setError('Failed to load posts. Please try again.');
-      
-      // Use mock data as fallback
-      const mockPosts = await generateMockPosts(10);
-      setPosts(mockPosts);
     } finally {
       setRefreshing(false);
       setLoadingMore(false);
@@ -71,83 +247,92 @@ export default function FeedScreen() {
     }
   };
 
-  // Like post functionality - Re-enable optimistic with mismatch handling
- const handleLikePost = (postId: string) => {
-  setPosts(prevPosts => 
-    prevPosts.map(post => 
-      post.id === postId 
-        ? { 
-            ...post, 
-            isLiked: !post.isLiked, 
-            likes: post.likes + (!post.isLiked ? 1 : -1)
-          }
-        : post
-    )
-  );
-  
-};
+  // Like post functionality with GraphQL-like service
+  const handleLikePost = async (postId: string) => {
+    // Optimistic update
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              isLiked: !post.isLiked, 
+              likes: post.likes + (!post.isLiked ? 1 : -1)
+            }
+          : post
+      )
+    );
 
-  // Share post functionality - Add mismatch handling and clipboard copy
-const handleSharePost = async (postId: string) => {
-  setPosts(prevPosts => 
-    prevPosts.map(post => 
-      post.id === postId 
-        ? { 
-            ...post, 
-            isShared: !post.isShared, 
-            shares: (post.shares || 0) + (!post.isShared ? 1 : -1)
-          }
-        : post
-    )
-  );
+    try {
+      await graphqlService.likePost(postId);
+    } catch (error) {
+      console.error('Error liking post:', error);
+      // Revert optimistic update on error
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === postId 
+            ? { 
+                ...post, 
+                isLiked: !post.isLiked, 
+                likes: post.likes + (post.isLiked ? 1 : -1)
+              }
+            : post
+        )
+      );
+    }
+  };
 
-  try {
-    const postUrl = `https://yourapp.com/post/${postId}`;
-    await Clipboard.setStringAsync(postUrl);
-    Alert.alert('Shared!', 'Post URL copied to clipboard!');
-  } catch (error) {
-    console.error('Error copying to clipboard:', error);
-    
-    // Revert on error
+  // Share post functionality
+  const handleSharePost = async (postId: string) => {
+    // Optimistic update
     setPosts(prevPosts => 
       prevPosts.map(post => 
         post.id === postId 
           ? { 
               ...post, 
               isShared: !post.isShared, 
-              shares: (post.shares || 0) + (post.isShared ? 1 : -1)
+              shares: (post.shares || 0) + (!post.isShared ? 1 : -1)
             }
           : post
       )
     );
-    
-    Alert.alert('Error', 'Failed to copy link. Please try again.');
-  }
-};
 
-  // FIXED: Comment functionality - Get current user info properly
-  const getCurrentUser = () => {
-    // FIXED: Replace with actual current user data from your auth system
-    // This is a placeholder - you should get this from your auth context/service
-    return {
-      id: 'current-user-id',
-      name: 'Current User', // Replace with actual user name
-      username: 'currentuser', // Replace with actual username  
-      avatar: 'https://i.pravatar.cc/150?img=1' // Replace with actual avatar
-    };
+    try {
+      await graphqlService.sharePost(postId);
+      const postUrl = `https://yourapp.com/post/${postId}`;
+      await Clipboard.setStringAsync(postUrl);
+      Alert.alert('Shared!', 'Post URL copied to clipboard!');
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      
+      // Revert on error
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === postId 
+            ? { 
+                ...post, 
+                isShared: !post.isShared, 
+                shares: (post.shares || 0) + (post.isShared ? 1 : -1)
+              }
+            : post
+        )
+      );
+      
+      Alert.alert('Error', 'Failed to share post. Please try again.');
+    }
   };
 
   const handleAddComment = async () => {
-    if (!selectedPost || !commentText.trim()) return;
+    if (!selectedPost || !commentText.trim() || !currentUser) return;
 
     setIsSubmittingComment(true);
     
-    const tempCommentId = `temp-${Date.now()}`; // Temp ID for optimistic
-    const currentUser = getCurrentUser();
+    const tempCommentId = `temp-${Date.now()}-${Math.random()}`;
+    
+    // Create optimistic comment with current user data
     const optimisticComment: Comment = {
       id: tempCommentId,
       content: commentText.trim(),
-      author: currentUser, // Use current user for optimism
+      author: currentUser,
       createdAt: new Date().toISOString(),
     };
 
@@ -165,10 +350,10 @@ const handleSharePost = async (postId: string) => {
     } : null);
 
     try {
-      const response = await addComment(selectedPost.id, commentText.trim());
+      const response = await graphqlService.addComment(selectedPost.id, commentText.trim());
+      const realComment = response.comment;
       
       // Replace temp comment with real one
-      const realComment = response.comment;
       setPosts(prevPosts => 
         prevPosts.map(post => 
           post.id === selectedPost.id 
@@ -188,30 +373,12 @@ const handleSharePost = async (postId: string) => {
         )
       } : null);
 
-      // If author mismatch or undefined in API, fallback to current user
-      if (!realComment.author || !realComment.author.name) {
-        console.warn('API comment author undefined; using local user');
-        realComment.author = currentUser;
-      }
-
       setCommentText('');
-      
-      // Success message but keep modal open so user can see their comment
-      Alert.alert('Success', 'Comment added successfully!', [
-        {
-          text: 'View Comments',
-          onPress: () => {
-            // Modal stays open, user can see their comment
-          }
-        },
-        {
-          text: 'Close',
-          onPress: () => setCommentModalVisible(false)
-        }
-      ]);
+      Alert.alert('Success', 'Comment added successfully!');
       
     } catch (error) {
       console.error('Error adding comment:', error);
+      
       // Remove optimistic comment on error
       setPosts(prevPosts => 
         prevPosts.map(post => 
@@ -224,6 +391,7 @@ const handleSharePost = async (postId: string) => {
         ...prev,
         comments: prev.comments.filter(c => c.id !== tempCommentId)
       } : null);
+      
       Alert.alert('Error', 'Failed to add comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
@@ -265,7 +433,16 @@ const handleSharePost = async (postId: string) => {
 
   return (
     <View style={styles.container}>
-      {/* IMPROVED: Comment Modal with comment display */}
+      {/* Current User Info Bar */}
+      {currentUser && (
+        <View style={styles.userInfoBar}>
+          <Text style={styles.welcomeText}>
+            Welcome, {currentUser.name} (@{currentUser.username})
+          </Text>
+        </View>
+      )}
+
+      {/* Comment Modal */}
       <Modal
         visible={commentModalVisible}
         animationType="slide"
@@ -285,14 +462,19 @@ const handleSharePost = async (postId: string) => {
             </TouchableOpacity>
           </View>
 
-          {/* ADDED: Comments List */}
+          {/* Comments List */}
           <FlatList
             data={selectedPost?.comments || []}
             keyExtractor={(comment) => comment.id}
             renderItem={({ item: comment }) => (
               <View style={styles.commentItem}>
                 <View style={styles.commentHeader}>
-                  <Text style={styles.commentAuthor}>{comment.author?.name || 'Anonymous'}</Text>
+                  <Text style={styles.commentAuthor}>
+                    {comment.author?.name || 'Anonymous User'}
+                  </Text>
+                  <Text style={styles.commentUsername}>
+                    @{comment.author?.username || 'unknown'}
+                  </Text>
                   <Text style={styles.commentTime}>
                     {new Date(comment.createdAt).toLocaleDateString()}
                   </Text>
@@ -353,7 +535,7 @@ const handleSharePost = async (postId: string) => {
             onShare={handleSharePost}
           />
         )}
-        keyExtractor={(item) => `post-${item.id}`}
+        keyExtractor={(item, index) => `${item.id}-${index}`} // Fixed: Unique keys
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -398,52 +580,20 @@ const handleSharePost = async (postId: string) => {
   );
 }
 
-// Fallback function for mock data
-// FIXED: Mock data generator with unique keys
-const generateMockPosts = async (count: number): Promise<PostType[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Use a counter to ensure unique IDs across all posts
-  let commentIdCounter = 1;
-  
-  return Array.from({ length: count }, (_, i) => {
-    const commentCount = Math.floor(Math.random() * 5);
-    
-    return {
-      id: `post-${Date.now()}-${i}`, // More unique post ID
-      content: `This is a fallback post ${i + 1} with interactive features. You can like, comment, and share this post to test the functionality.`,
-      author: {
-        id: `user-${Date.now()}-${i}`,
-        name: `User ${i + 1}`,
-        username: `user${i + 1}`,
-        avatar: `https://i.pravatar.cc/150?img=${i + 1}`
-      },
-      likes: Math.floor(Math.random() * 100),
-      isLiked: Math.random() > 0.5,
-      shares: Math.floor(Math.random() * 50),
-      isShared: false,
-      comments: Array.from({ length: commentCount }, (_, j) => {
-        const commentId = `comment-${Date.now()}-${commentIdCounter++}`;
-        return {
-          id: commentId,
-          content: `This is comment ${j + 1} on post ${i + 1}`,
-          author: {
-            id: `commenter-${Date.now()}-${commentIdCounter}`,
-            name: `Commenter ${j + 1}`,
-            username: `commenter${j + 1}`,
-            avatar: `https://i.pravatar.cc/150?img=${j + 10}`
-          },
-          createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString()
-        };
-      }),
-      createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString()
-    };
-  });
-};
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  userInfoBar: {
+    backgroundColor: '#5D0A85',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  welcomeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 20,
@@ -495,7 +645,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // NEW: Comments list styles
+  // Comments list styles
   commentsList: {
     flex: 1,
     paddingHorizontal: 16,
@@ -507,17 +657,24 @@ const styles = StyleSheet.create({
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
+    gap: 8,
   },
   commentAuthor: {
     fontWeight: '600',
     fontSize: 14,
     color: '#333',
   },
+  commentUsername: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
   commentTime: {
     fontSize: 12,
     color: '#666',
+    marginLeft: 'auto',
   },
   commentContent: {
     fontSize: 14,
@@ -535,7 +692,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  // Updated comment input styles
+  // Comment input styles
   commentInputContainer: {
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',

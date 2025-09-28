@@ -21,13 +21,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-// GraphQL Client Setup (Mock implementation)
+// GraphQL Client Setup with JSONPlaceholder integration
 class GraphQLClient {
-  private baseUrl = 'https://jsonplaceholder.typicode.com'; // Mock API
+  private baseUrl = 'https://jsonplaceholder.typicode.com';
   
   async query(query: string, variables?: any): Promise<any> {
     // Simulate GraphQL query delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
     
     // Mock GraphQL responses based on query type
     if (query.includes('getUserProfile')) {
@@ -53,9 +53,9 @@ class GraphQLClient {
           name: 'Sally Wanga',
           username: 'mugisha',
           bio: 'React Native Developer | Building amazing mobile experiences 🚀',
-          avatar: 'https://photos.fife.usercontent.google.com/pw/AP1GczP_TZubyse3kcZV9aRX7q90hYtZl_7nFr2nCNwy__KkRXPdaOKVcqI-Mg=w372-h827-s-no-gm?authuser=0',
+          avatar: 'https://drive.google.com/file/d/11_6IeGFTcR4OTF17-K_6xfgtHmM2bhMc/view?usp=sharing',
           coverImage: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&h=200&fit=crop',
-          postsCount: 24,
+          postsCount: 100,
           followers: 1284,
           following: 563,
           joinedDate: 'January 2023',
@@ -66,67 +66,77 @@ class GraphQLClient {
     };
   }
   
+  // Enhanced getUserPosts with real JSONPlaceholder data
   private async getUserPosts(offset: number, limit: number) {
-    const allPosts = [
-      {
-        id: '1',
-        content: 'Just launched my new React Native app! 🚀',
-        image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=300&h=200&fit=crop',
-        likes: 42,
-        comments: 8,
-        timestamp: '2h ago',
-        isLiked: false,
-      },
-      {
-        id: '2',
-        content: 'Beautiful sunset from my morning walk ☀️',
-        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop',
-        likes: 128,
-        comments: 15,
-        timestamp: '1d ago',
-        isLiked: true,
-      },
-      {
-        id: '3',
-        content: 'Working on some exciting new features. Stay tuned! 💻',
-        likes: 89,
-        comments: 23,
-        timestamp: '3d ago',
-        isLiked: false,
-      },
-      {
-        id: '4',
-        content: 'Amazing conference today! Learned so much about React Native performance optimization 📚',
-        image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&h=200&fit=crop',
-        likes: 156,
-        comments: 32,
-        timestamp: '5d ago',
-        isLiked: true,
-      },
-      {
-        id: '5',
-        content: 'Coffee and code - perfect Sunday morning ☕',
-        image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=300&h=200&fit=crop',
-        likes: 67,
-        comments: 12,
-        timestamp: '1w ago',
-        isLiked: false,
-      },
+    try {
+      // Fetch posts from JSONPlaceholder
+      const postsResponse = await fetch(`${this.baseUrl}/posts?_start=${offset}&_limit=${limit}`);
+      const posts = await postsResponse.json();
+      
+      // Fetch photos from JSONPlaceholder for media posts
+      const photosResponse = await fetch(`${this.baseUrl}/photos?_start=${offset}&_limit=${Math.ceil(limit / 2)}`);
+      const photos = await photosResponse.json();
+      
+      // Create enhanced posts with real content
+      const enhancedPosts = posts.map((post: any, index: number) => {
+        const hasImage = Math.random() > 0.4; // 60% chance of having an image
+        const photo = photos[index % photos.length];
+        
+        return {
+          id: post.id.toString(),
+          content: this.enhancePostContent(post.title, post.body),
+          image: hasImage ? photo?.url : undefined,
+          likes: Math.floor(Math.random() * 200) + 10,
+          comments: Math.floor(Math.random() * 50) + 1,
+          timestamp: this.getRandomTimestamp(),
+          isLiked: Math.random() > 0.7,
+          type: hasImage ? 'media' : 'text',
+          userId: post.userId
+        };
+      });
+      
+      return {
+        data: {
+          posts: enhancedPosts,
+          hasMore: posts.length === limit, // If we got the full limit, there might be more
+          total: 100 // JSONPlaceholder has 100 posts
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      return {
+        data: {
+          posts: [],
+          hasMore: false,
+          total: 0
+        }
+      };
+    }
+  }
+  
+  private enhancePostContent(title: string, body: string): string {
+    // Make content more social media friendly
+    const emojis = ['🚀', '💻', '🌟', '👨‍💻', '📱', '💡', '🎯', '🔥', '✨', '💪', '🎉', '📸', '🌍', '💫'];
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    // Sometimes use just the title, sometimes combine with body excerpt
+    if (Math.random() > 0.6) {
+      return `${title} ${randomEmoji}`;
+    } else {
+      const bodyExcerpt = body.length > 100 ? body.substring(0, 100) + '...' : body;
+      return `${title}\n\n${bodyExcerpt} ${randomEmoji}`;
+    }
+  }
+  
+  private getRandomTimestamp(): string {
+    const timestamps = [
+      'just now', '5m ago', '15m ago', '1h ago', '2h ago', '5h ago',
+      '1d ago', '2d ago', '3d ago', '5d ago', '1w ago', '2w ago', '1mo ago'
     ];
-    
-    const posts = allPosts.slice(offset, offset + limit);
-    
-    return {
-      data: {
-        posts: posts,
-        hasMore: offset + limit < allPosts.length,
-        total: allPosts.length
-      }
-    };
+    return timestamps[Math.floor(Math.random() * timestamps.length)];
   }
   
   private async likePost(postId: string) {
-    // Return success without changing the like count
     return {
       data: {
         likePost: {
@@ -151,32 +161,35 @@ class GraphQLClient {
   }
   
   private async getComments(postId: string) {
-    const mockComments = [
-      {
-        id: '1',
-        content: 'Amazing work! Keep it up 👏',
-        author: 'Sarah Miller',
-        timestamp: '1h ago',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b47c?w=50&h=50&fit=crop&crop=face'
-      },
-      {
-        id: '2',
-        content: 'This looks fantastic! Can\'t wait to try it out.',
-        author: 'Mike Chen',
-        timestamp: '3h ago',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop&crop=face'
-      },
-    ];
-    
-    return {
-      data: {
-        comments: mockComments
-      }
-    };
+    try {
+      // Fetch real comments from JSONPlaceholder
+      const response = await fetch(`${this.baseUrl}/comments?postId=${postId}&_limit=5`);
+      const comments = await response.json();
+      
+      const enhancedComments = comments.map((comment: any) => ({
+        id: comment.id.toString(),
+        content: comment.body,
+        author: comment.name,
+        timestamp: this.getRandomTimestamp(),
+        avatar: `https://images.unsplash.com/photo-${1500000000000 + parseInt(comment.id)}?w=50&h=50&fit=crop&crop=face`
+      }));
+      
+      return {
+        data: {
+          comments: enhancedComments
+        }
+      };
+    } catch (error) {
+      return {
+        data: {
+          comments: []
+        }
+      };
+    }
   }
 }
 
-// GraphQL Queries
+// GraphQL Queries (unchanged)
 const QUERIES = {
   GET_USER_PROFILE: `
     query getUserProfile($userId: ID!) {
@@ -207,6 +220,7 @@ const QUERIES = {
         comments
         timestamp
         isLiked
+        type
       }
       hasMore
       total
@@ -254,6 +268,8 @@ interface Post {
   comments: number;
   timestamp: string;
   isLiked: boolean;
+  type: 'media' | 'text';
+  userId?: number;
 }
 
 interface User {
@@ -334,7 +350,7 @@ export default function ProfileScreen() {
   };
 
   const loadMorePosts = async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || activeTab !== 'posts') return;
     
     try {
       setLoadingMore(true);
@@ -390,7 +406,6 @@ export default function ProfileScreen() {
     ));
 
     try {
-      // Send request to server (but don't use the response to update UI)
       await client.query(QUERIES.LIKE_POST, { postId });
       console.log('Like request sent successfully');
     } catch (error) {
@@ -490,13 +505,14 @@ export default function ProfileScreen() {
     ]);
   };
 
-  // Get filtered posts based on active tab
+  // Enhanced filtering logic for more distinct media posts
   const getFilteredPosts = () => {
     switch (activeTab) {
       case 'posts':
-        return posts;
+        return posts; // Show all posts
       case 'media':
-        return posts.filter(post => post.image);
+        // Only show posts that have images (photos)
+        return posts.filter(post => post.type === 'media' && post.image);
       case 'likes':
         return posts.filter(post => post.isLiked);
       default:
@@ -508,7 +524,14 @@ export default function ProfileScreen() {
     <View style={styles.postCard}>
       <Text style={styles.postContent}>{post.content}</Text>
       {post.image && (
-        <Image source={{ uri: post.image }} style={styles.postImage} />
+        <TouchableOpacity onPress={() => {/* Handle image view */}}>
+          <Image source={{ uri: post.image }} style={styles.postImage} />
+          {activeTab === 'media' && (
+            <View style={styles.mediaBadge}>
+              <Ionicons name="camera" size={12} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
       )}
       <View style={styles.postActions}>
         <TouchableOpacity 
@@ -625,6 +648,16 @@ export default function ProfileScreen() {
             style={[styles.navItem, activeTab === tab && styles.activeNavItem]}
             onPress={() => setActiveTab(tab)}
           >
+            <Ionicons 
+              name={
+                tab === 'posts' ? 'grid-outline' : 
+                tab === 'media' ? 'camera-outline' : 
+                'heart-outline'
+              } 
+              size={18} 
+              color={activeTab === tab ? '#5D0A85' : '#666'}
+              style={{ marginBottom: 4 }}
+            />
             <Text style={[styles.navText, activeTab === tab && styles.activeNavText]}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </Text>
@@ -637,18 +670,25 @@ export default function ProfileScreen() {
   const renderEmptyState = () => {
     let emptyMessage = 'No posts yet';
     let emptySubtext = 'When you create posts, they\'ll appear here';
+    let iconName = 'document-text-outline';
     
     if (activeTab === 'media') {
-      emptyMessage = 'No media posts';
-      emptySubtext = 'Posts with photos and videos will appear here';
+      emptyMessage = 'No photos';
+      emptySubtext = 'Posts with photos will appear here';
+      iconName = 'camera-outline';
     } else if (activeTab === 'likes') {
       emptyMessage = 'No liked posts';
       emptySubtext = 'Posts you like will appear here';
+      iconName = 'heart-outline';
     }
 
     return (
       <View style={styles.emptyState}>
-        <Ionicons name="document-text-outline" size={48} color="#ccc" />
+        <Ionicons 
+          name={iconName as any} 
+          size={48} 
+          color="#ccc" 
+        />
         <Text style={styles.emptyStateText}>{emptyMessage}</Text>
         <Text style={styles.emptyStateSubtext}>{emptySubtext}</Text>
       </View>
@@ -692,19 +732,19 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>{user.name}</Text>
       </Animated.View>
 
-      {/* Single FlatList with filtered posts based on active tab */}
+      {/* Enhanced FlatList with better infinite scrolling */}
       <FlatList
         data={filteredPosts}
         renderItem={renderPost}
-       keyExtractor={(item) => `${activeTab}-${item.id}`}
+        keyExtractor={(item) => `${activeTab}-${item.id}`}
         ListHeaderComponent={renderHeader}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        onEndReached={activeTab === 'posts' ? loadMorePosts : undefined}
-        onEndReachedThreshold={0.5}
+        onEndReached={loadMorePosts}
+        onEndReachedThreshold={0.3}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
@@ -712,9 +752,17 @@ export default function ProfileScreen() {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.flatListContent}
-        key={activeTab} // Force re-render when tab changes
+        maxToRenderPerBatch={5}
+        windowSize={10}
+        removeClippedSubviews={true}
+        getItemLayout={(data, index) => ({
+          length: 200, // Approximate item height
+          offset: 200 * index,
+          index,
+        })}
       />
 
+      {/* All Modals remain the same... */}
       {/* Edit Profile Modal */}
       <Modal
         visible={showEditModal}
@@ -1037,7 +1085,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#5D0A85',
   },
   navText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#666',
   },
@@ -1060,6 +1108,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    position: 'relative',
   },
   postContent: {
     fontSize: 16,
@@ -1095,16 +1144,26 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
   },
+  mediaBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(93, 10, 133, 0.8)',
+    padding: 6,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   emptyState: {
     alignItems: 'center',
-    padding: 40,
+    padding: 60,
     backgroundColor: '#f8f8f8',
     marginHorizontal: 16,
     marginTop: 20,
     borderRadius: 12,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#666',
     marginTop: 12,
@@ -1112,8 +1171,9 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     color: '#999',
-    marginTop: 4,
+    marginTop: 8,
     textAlign: 'center',
+    lineHeight: 20,
   },
   modalContainer: {
     flex: 1,
@@ -1230,12 +1290,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#f9f9f9',
   },
-    commentButton: {
-      backgroundColor: '#5D0A85',
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-  });
+  commentButton: {
+    backgroundColor: '#5D0A85',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
